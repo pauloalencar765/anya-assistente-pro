@@ -11,8 +11,10 @@ def home():
 
 # Endpoint do webhook da Z-API
 @app.route("/zapi-webhook", methods=["POST"])
-def receber_mensagem():
-    dados = request.get_json()
+def receber_webhook():
+    dados = request.json
+    print("📩 Webhook recebido:", dados)
+    return jsonify({"status": "ok"}), 200
 
     # Extrair número e mensagem
     try:
