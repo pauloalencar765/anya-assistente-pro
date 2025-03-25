@@ -7,30 +7,38 @@ import json
 
 app = Flask(__name__)
 
-# Lista de contatos e grupos
+# === CONFIGURAÇÃO ===
+
+ZAPI_INSTANCE_ID = "FC0B82079B45ED7020B78617"  # Seu ID da Z-API
+ZAPI_TOKEN = "7uw0lx81pjzrs0r1"               # Seu token da Z-API
+
+# === CONTATOS E GRUPOS ===
+
 GRUPOS_MOTIVACAO = [
     "FAMÍLIA", "FAMÍLIA MOUTA", "Família Figueiredo",
     "Best Family", "Diretoria", "Sócios Mananciais", "Irmãos"
 ]
 GRUPO_LOG = "Assistente Pessoal"
-
-# Mensagem motivacional fixa (pode ser personalizada depois)
 MENSAGEM_DIARIA = "Bom dia! Que hoje seja um dia produtivo e cheio de realizações. 💪"
 
-# Armazena última interação para controle de inatividade
+# === CONTROLE DE INTERAÇÕES ===
+
 ultimas_interacoes = {}
 
-# Envia mensagem via Z-API
+# === FUNÇÕES ===
+
 def enviar_mensagem(destinatario, mensagem):
-    url = "https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/send-text"
+    url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/send-text"
     payload = {
         "phone": destinatario,
         "message": mensagem
     }
     headers = {'Content-Type': 'application/json'}
-    requests.post(url, data=json.dumps(payload), headers=headers)
+    try:
+        requests.post(url, data=json.dumps(payload), headers=headers)
+    except Exception as e:
+        print(f"[ERRO] Falha ao enviar mensagem para {destinatario}: {e}")
 
-# Envia mensagens motivacionais às 6h da manhã
 def agendar_mensagens_diarias():
     while True:
         agora = datetime.now()
@@ -39,11 +47,11 @@ def agendar_mensagens_diarias():
             proxima_execucao += timedelta(days=1)
         tempo_espera = (proxima_execucao - agora).total_seconds()
         time.sleep(tempo_espera)
+
         for grupo in GRUPOS_MOTIVACAO:
             enviar_mensagem(grupo, MENSAGEM_DIARIA)
         enviar_mensagem(GRUPO_LOG, f"✅ Mensagens motivacionais enviadas para: {', '.join(GRUPOS_MOTIVACAO)}")
 
-# Responde mensagens após 5 minutos se não houver resposta
 def monitorar_inatividade():
     while True:
         agora = datetime.now()
@@ -53,7 +61,8 @@ def monitorar_inatividade():
                 ultimas_interacoes.pop(contato)
         time.sleep(60)
 
-# Webhook Z-API
+# === ENDPOINTS ===
+
 @app.route("/zapi-webhook", methods=["POST"])
 def receber_webhook():
     dados = request.json
@@ -64,22 +73,20 @@ def receber_webhook():
     remetente = dados.get('phone') or dados.get('chatId')
     conteudo = mensagem.strip()
 
-    # Atualiza horário da última mensagem recebida
     ultimas_interacoes[remetente] = datetime.now()
 
-    # Registra a mensagem recebida no grupo de log
     log = f"📥 Mensagem de {remetente}: {conteudo}"
     enviar_mensagem(GRUPO_LOG, log)
 
     return jsonify({"status": "mensagem registrada"})
 
-# Rota básica para teste
 @app.route("/")
 def index():
     return "Anya Assistente está no ar!"
 
+# === EXECUÇÃO ===
+
 if __name__ == "__main__":
-    # Inicia agendamentos em background
     threading.Thread(target=agendar_mensagens_diarias, daemon=True).start()
     threading.Thread(target=monitorar_inatividade, daemon=True).start()
     app.run(host="0.0.0.0", port=10000)
