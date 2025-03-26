@@ -25,10 +25,8 @@ GRUPOS_MOTIVACAO = [
     "FAMÍLIA", "FAMÍLIA MOUTA", "Família Figueiredo",
     "Best Family", "Diretoria", "Sócios Mananciais", "Irmãos"
 ]
-
 GRUPO_LOG_NOME = "Assistente Pessoal"
 GRUPO_LOG_ID = None
-
 MENSAGEM_DIARIA = "Bom dia! Que hoje seja um dia produtivo e cheio de realizações. 💪"
 
 # === CONTROLE DE INTERAÇÕES ===
@@ -40,10 +38,6 @@ INTERVALO_MONITORAMENTO_INATIVIDADE_SEGUNDOS = 60
 # === FUNÇÕES ===
 
 def enviar_mensagem(destinatario, mensagem):
-    if not ZAPI_INSTANCE_ID or not ZAPI_TOKEN:
-        logging.error(f"Não é possível enviar mensagem para {destinatario}. Configurações da Z-API não definidas.")
-        return
-
     url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/send-text"
     payload = {
         "phone": destinatario,
@@ -68,9 +62,12 @@ def obter_id_grupo_por_nome(nome_grupo):
     try:
         response = requests.get(url, headers=headers)
         response.raise_for_status()
-        data = response.json()
 
-        logging.info(f"[DEBUG] Conteúdo retornado por /chats: {json.dumps(data, indent=2, ensure_ascii=False)}")
+        raw = response.text
+        logging.info(f"[DEBUG] Resposta bruta de /chats: {raw}")
+
+        data = response.json()
+        logging.info(f"[DEBUG] JSON de /chats: {json.dumps(data, indent=2, ensure_ascii=False)}")
 
         chats = data.get("chats") if isinstance(data, dict) else data
         if isinstance(chats, str):
