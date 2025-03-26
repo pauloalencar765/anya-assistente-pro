@@ -74,11 +74,12 @@ def agendar_mensagens_diarias():
 def monitorar_inatividade():
     while True:
         agora = datetime.now()
+        contatos_inativos =
         for contato, timestamp in list(ultimas_interacoes.items()):
             if agora - timestamp > timedelta(minutes=INATIVIDADE_TIMEOUT_MINUTOS):
                 contatos_inativos.append(contato)
 
-        for contato in contatos_inativos:
+        for contato in list(contatos_inativos): # Iterando sobre uma cópia da lista
             enviar_mensagem(contato, f"👋 Oi! Você mandou uma mensagem e ainda não tive tempo de responder. Em que posso te ajudar?")
             ultimas_interacoes.pop(contato)
 
