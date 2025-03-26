@@ -5,22 +5,13 @@ import time
 import requests
 import json
 import logging
-import os
 
 app = Flask(__name__)
 
 # === CONFIGURAÇÃO ===
 
-ZAPI_INSTANCE_ID = os.environ.get("ZAPI_INSTANCE_ID")  # Usar variável de ambiente
-ZAPI_TOKEN = os.environ.get("ZAPI_TOKEN")            # Usar variável de ambiente
-
-if not ZAPI_INSTANCE_ID or not ZAPI_TOKEN:
-    print("[ERRO] As variáveis de ambiente ZAPI_INSTANCE_ID e ZAPI_TOKEN não estão definidas.")
-    # Considerar interromper a aplicação aqui se as configurações forem essenciais
-    # raise EnvironmentError("Variáveis de ambiente ZAPI não definidas.")
-
-# === LOGGING ===
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+ZAPI_INSTANCE_ID = "FC0B82079B45ED7020B78617"
+ZAPI_TOKEN = "7uw0lx81pjzrs0r1"
 
 # === CONTATOS E GRUPOS ===
 
@@ -34,16 +25,11 @@ MENSAGEM_DIARIA = "Bom dia! Que hoje seja um dia produtivo e cheio de realizaç�
 # === CONTROLE DE INTERAÇÕES ===
 
 ultimas_interacoes = {}
-INATIVIDADE_TIMEOUT_MINUTOS = 5
-INTERVALO_MONITORAMENTO_INATIVIDADE_SEGUNDOS = 60
+contatos_inativos = {}
 
 # === FUNÇÕES ===
 
 def enviar_mensagem(destinatario, mensagem):
-    if not ZAPI_INSTANCE_ID or not ZAPI_TOKEN:
-        logging.error(f"Não é possível enviar mensagem para {destinatario}. Configurações da Z-API não definidas.")
-        return
-
     url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/send-text"
     payload = {
         "phone": destinatario,
@@ -51,10 +37,8 @@ def enviar_mensagem(destinatario, mensagem):
     }
     headers = {'Content-Type': 'application/json'}
     try:
-        response = requests.post(url, data=json.dumps(payload), headers=headers)
-        response.raise_for_status()  # Levanta uma exceção para status de erro (4xx ou 5xx)
-        logging.info(f"Mensagem enviada para {destinatario}: {mensagem}")
-    except requests.exceptions.RequestException as e:
+        requests.post(url, data=json.dumps(payload), headers=headers)
+    except Exception as e:
         logging.error(f"[ERRO] Falha ao enviar mensagem para {destinatario}: {e}")
 
 def agendar_mensagens_diarias():
@@ -64,7 +48,6 @@ def agendar_mensagens_diarias():
         if agora >= proxima_execucao:
             proxima_execucao += timedelta(days=1)
         tempo_espera = (proxima_execucao - agora).total_seconds()
-        logging.info(f"Próxima execução de mensagens diárias em {tempo_espera:.0f} segundos.")
         time.sleep(tempo_espera)
 
         for grupo in GRUPOS_MOTIVACAO:
@@ -75,33 +58,31 @@ def monitorar_inatividade():
     while True:
         agora = datetime.now()
         for contato, timestamp in list(ultimas_interacoes.items()):
-        for contato, timestamp in list(ultimas_interacoes.items()):
-            if agora - timestamp > timedelta(minutes=INATIVIDADE_TIMEOUT_MINUTOS):
-                contatos_inativos.append(contato)
-
-        for contato in list(contatos_inativos): # Iterando sobre uma cópia da lista
-            enviar_mensagem(contato, f"👋 Oi! Você mandou uma mensagem e ainda não tive tempo de responder. Em que posso te ajudar?")
-            ultimas_interacoes.pop(contato)
-
-        time.sleep(INTERVALO_MONITORAMENTO_INATIVIDADE_SEGUNDOS)
+            if agora - timestamp > timedelta(minutes=5):
+                if contato not in contatos_inativos:
+                    enviar_mensagem(contato, "👋 Oi! Você mandou uma mensagem e ainda não tive tempo de responder. Em que posso te ajudar?")
+                    contatos_inativos[contato] = True
+        time.sleep(60)
 
 # === ENDPOINTS ===
 
 @app.route("/zapi-webhook", methods=["POST"])
 def receber_webhook():
-    dados = request.json
-    logging.info(f"Dados recebidos no webhook: {dados}")
-
-    mensagem_conteudo = dados.get('message') or dados.get('body') or 'sem_conteudo'
-    remetente = dados.get('phone') or dados.get('chatId') or "desconhecido"
-
     try:
-        conteudo = mensagem_conteudo.strip()
+        dados = request.json
+        logging.info(f"Dados recebidos no webhook: {dados}")
+
+        if not dados or 'message' not in dados:
+            return jsonify({"status": "sem mensagem"}), 400
+
+        mensagem = dados.get('message') or dados.get('body') or 'sem_conteudo'
+        remetente = dados.get('phone') or dados.get('chatId') or 'desconhecido'
+        conteudo = mensagem.strip()
 
         ultimas_interacoes[remetente] = datetime.now()
-
-        log = f"📥 Mensagem de {remetente}: {conteudo}"
+        log = f"📥 Mensagem de {remetente}: {mensagem}"
         enviar_mensagem(GRUPO_LOG, log)
+
         return jsonify({"status": "mensagem registrada"})
 
     except Exception as e:
@@ -115,6 +96,7 @@ def index():
 # === EXECUÇÃO ===
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     threading.Thread(target=agendar_mensagens_diarias, daemon=True).start()
     threading.Thread(target=monitorar_inatividade, daemon=True).start()
     app.run(host="0.0.0.0", port=10000)
