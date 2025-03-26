@@ -10,11 +10,13 @@ app = Flask(__name__)
 
 # === CONFIGURAÇÃO ===
 
+CLIENT_TOKEN = "Faff5c7d30dbe4802bba8a32859847564S"
 ZAPI_INSTANCE_ID = "3DEBB2A5B63D80B04CBFFA8592F99CB9"
 ZAPI_TOKEN = "FC0BB2079B45ED702078B617"
 SEU_NUMERO = "559888425166"
 
 # === LOGGING ===
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # === CONTATOS E GRUPOS ===
@@ -23,8 +25,10 @@ GRUPOS_MOTIVACAO = [
     "FAMÍLIA", "FAMÍLIA MOUTA", "Família Figueiredo",
     "Best Family", "Diretoria", "Sócios Mananciais", "Irmãos"
 ]
+
 GRUPO_LOG_NOME = "Assistente Pessoal"
 GRUPO_LOG_ID = None
+
 MENSAGEM_DIARIA = "Bom dia! Que hoje seja um dia produtivo e cheio de realizações. 💪"
 
 # === CONTROLE DE INTERAÇÕES ===
@@ -45,7 +49,10 @@ def enviar_mensagem(destinatario, mensagem):
         "phone": destinatario,
         "message": mensagem
     }
-    headers = {'Content-Type': 'application/json'}
+    headers = {
+        'Content-Type': 'application/json',
+        'Client-Token': CLIENT_TOKEN
+    }
     try:
         response = requests.post(url, data=json.dumps(payload), headers=headers)
         response.raise_for_status()
@@ -53,11 +60,13 @@ def enviar_mensagem(destinatario, mensagem):
     except requests.exceptions.RequestException as e:
         logging.error(f"[ERRO] Falha ao enviar mensagem para {destinatario}: {e}")
 
-
 def obter_id_grupo_por_nome(nome_grupo):
-    url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/chats"
+    url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/chats"
+    headers = {
+        "Client-Token": CLIENT_TOKEN
+    }
     try:
-        response = requests.get(url)
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
         data = response.json()
 
@@ -77,8 +86,6 @@ def obter_id_grupo_por_nome(nome_grupo):
         logging.error(f"[ERRO] Falha ao buscar grupo '{nome_grupo}': {e}")
     return None
 
-
-
 def agendar_mensagens_diarias():
     while True:
         agora = datetime.now()
@@ -86,11 +93,13 @@ def agendar_mensagens_diarias():
         if agora >= proxima_execucao:
             proxima_execucao += timedelta(days=1)
         tempo_espera = (proxima_execucao - agora).total_seconds()
+
         logging.info(f"Próxima execução de mensagens diárias em {tempo_espera:.0f} segundos.")
         time.sleep(tempo_espera)
 
         for grupo in GRUPOS_MOTIVACAO:
             enviar_mensagem(grupo, MENSAGEM_DIARIA)
+
         if GRUPO_LOG_ID:
             enviar_mensagem(GRUPO_LOG_ID, f"✅ Mensagens motivacionais enviadas para: {', '.join(GRUPOS_MOTIVACAO)}")
 
@@ -98,12 +107,13 @@ def monitorar_inatividade():
     while True:
         agora = datetime.now()
         contatos_inativos = []
+
         for contato, timestamp in list(ultimas_interacoes.items()):
             if agora - timestamp > timedelta(minutes=INATIVIDADE_TIMEOUT_MINUTOS):
                 contatos_inativos.append(contato)
 
-        for contato in list(contatos_inativos):
-            enviar_mensagem(contato, f"👋 Oi! Você mandou uma mensagem e ainda não tive tempo de responder. Em que posso te ajudar?")
+        for contato in contatos_inativos:
+            enviar_mensagem(contato, "👋 Oi! Você mandou uma mensagem e ainda não tive tempo de responder. Em que posso te ajudar?")
             ultimas_interacoes.pop(contato)
 
         time.sleep(INTERVALO_MONITORAMENTO_INATIVIDADE_SEGUNDOS)
@@ -117,12 +127,13 @@ def receber_webhook():
     logging.info(f"Dados recebidos no webhook: {dados}")
 
     mensagem_conteudo = (
-        dados.get('message') or
-        dados.get('body') or
+        dados.get("message") or
+        dados.get("body") or
         dados.get("text", {}).get("message", "") or
-        'sem_conteudo'
+        "sem_conteudo"
     )
-    remetente = dados.get('phone') or dados.get('chatId') or "desconhecido"
+
+    remetente = dados.get("phone") or dados.get("chatId") or "desconhecido"
     chat_name = dados.get("chatName", "Desconhecido")
     participante = dados.get("participantPhone", "Desconhecido")
 
