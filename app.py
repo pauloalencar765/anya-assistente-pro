@@ -66,8 +66,13 @@ def monitorar_inatividade():
 @app.route("/zapi-webhook", methods=["POST"])
 def receber_webhook():
     dados = request.json
+
+    # Log de segurança para debug
+    enviar_mensagem(GRUPO_LOG, f"[DEBUG] Webhook recebido: {json.dumps(dados, indent=2)}")
+
     if not dados or 'message' not in dados:
         return jsonify({"status": "sem mensagem"}), 400
+
 
     mensagem = dados['message']
     remetente = dados.get('phone') or dados.get('chatId')
