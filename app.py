@@ -25,7 +25,7 @@ GRUPOS_MOTIVACAO = [
     "FAMÍLIA", "FAMÍLIA MOUTA", "Família Figueiredo",
     "Best Family", "Diretoria", "Sócios Mananciais", "Irmãos"
 ]
-GRUPO_LOG_NOME = "Assistente Pessoal"
+GRUPO_LOG_NOME = "Assistente pessoal"
 GRUPO_LOG_ID = None
 MENSAGEM_DIARIA = "Bom dia! Que hoje seja um dia produtivo e cheio de realizações. 💪"
 
