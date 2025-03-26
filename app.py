@@ -58,15 +58,22 @@ def obter_id_grupo_por_nome(nome_grupo):
     try:
         response = requests.get(url)
         response.raise_for_status()
-        chats = response.json()
+        data = response.json()
+
+        chats = data.get("chats") or data  # fallback no caso de vir direto
+        if isinstance(chats, str):
+            chats = json.loads(chats)
+
         for chat in chats:
-            if chat.get("name") == nome_grupo:
+            if isinstance(chat, dict) and chat.get("name") == nome_grupo:
                 logging.info(f"[INFO] ID do grupo '{nome_grupo}' encontrado: {chat.get('id')}")
                 return chat.get("id")
+
         logging.warning(f"[AVISO] Grupo '{nome_grupo}' não encontrado.")
     except Exception as e:
         logging.error(f"[ERRO] Falha ao buscar grupo '{nome_grupo}': {e}")
     return None
+
 
 def agendar_mensagens_diarias():
     while True:
