@@ -5,19 +5,13 @@ import time
 import requests
 import json
 import logging
-import os
 
 app = Flask(__name__)
 
 # === CONFIGURAÇÃO ===
 
-ZAPI_INSTANCE_ID = os.environ.get("ZAPI_INSTANCE_ID")  # Usar variável de ambiente
-ZAPI_TOKEN = os.environ.get("ZAPI_TOKEN")            # Usar variável de ambiente
-
-if not ZAPI_INSTANCE_ID or not ZAPI_TOKEN:
-    print("[ERRO] As variáveis de ambiente ZAPI_INSTANCE_ID e ZAPI_TOKEN não estão definidas.")
-    # Considerar interromper a aplicação aqui se as configurações forem essenciais
-    # raise EnvironmentError("Variáveis de ambiente ZAPI não definidas.")
+ZAPI_INSTANCE_ID = "FC0BB2079B45ED702078B617"
+ZAPI_TOKEN = "3DEBB2A5B63D80B04CBFFA8592F99CB9"
 
 # === LOGGING ===
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -52,7 +46,7 @@ def enviar_mensagem(destinatario, mensagem):
     headers = {'Content-Type': 'application/json'}
     try:
         response = requests.post(url, data=json.dumps(payload), headers=headers)
-        response.raise_for_status()  # Levanta uma exceção para status de erro (4xx ou 5xx)
+        response.raise_for_status()
         logging.info(f"Mensagem enviada para {destinatario}: {mensagem}")
     except requests.exceptions.RequestException as e:
         logging.error(f"[ERRO] Falha ao enviar mensagem para {destinatario}: {e}")
@@ -79,7 +73,7 @@ def monitorar_inatividade():
             if agora - timestamp > timedelta(minutes=INATIVIDADE_TIMEOUT_MINUTOS):
                 contatos_inativos.append(contato)
 
-        for contato in list(contatos_inativos): # Iterando sobre uma cópia da lista
+        for contato in list(contatos_inativos):
             enviar_mensagem(contato, f"👋 Oi! Você mandou uma mensagem e ainda não tive tempo de responder. Em que posso te ajudar?")
             ultimas_interacoes.pop(contato)
 
@@ -97,9 +91,7 @@ def receber_webhook():
 
     try:
         conteudo = mensagem_conteudo.strip()
-
         ultimas_interacoes[remetente] = datetime.now()
-
         log = f"📥 Mensagem de {remetente}: {conteudo}"
         enviar_mensagem(GRUPO_LOG, log)
         return jsonify({"status": "mensagem registrada"})
