@@ -67,21 +67,23 @@ def monitorar_inatividade():
 def receber_webhook():
     dados = request.json
 
-    # Log de segurança para debug
-    enviar_mensagem(GRUPO_LOG, f"[DEBUG] Webhook recebido: {json.dumps(dados, indent=2)}")
+    # Log bruto para debug
+    enviar_mensagem(GRUPO_LOG, f"[DEBUG] Webhook bruto recebido:\n{json.dumps(dados, indent=2)}")
 
-    if not dados or 'message' not in dados:
-        return jsonify({"status": "sem mensagem"}), 400
+    try:
+        # Tenta extrair conteúdo da mensagem
+        mensagem = dados.get('message') or dados.get('body') or 'sem_conteudo'
+        remetente = dados.get('phone') or dados.get('chatId') or 'desconhecido'
 
-    mensagem = dados['message']
-    remetente = dados.get('phone') or dados.get('chatId')
-    conteudo = mensagem.strip()
+        ultimas_interacoes[remetente] = datetime.now()
+        log = f"📥 Mensagem de {remetente}: {mensagem}"
+        enviar_mensagem(GRUPO_LOG, log)
 
-    ultimas_interacoes[remetente] = datetime.now()
-    log = f"📥 Mensagem de {remetente}: {conteudo}"
-    enviar_mensagem(GRUPO_LOG, log)
+        return jsonify({"status": "mensagem registrada"})
+    except Exception as e:
+        enviar_mensagem(GRUPO_LOG, f"[ERRO] Falha no processamento do webhook: {e}")
+        return jsonify({"erro": str(e)}), 500
 
-    return jsonify({"status": "mensagem registrada"})
 
 
 @app.route("/")
