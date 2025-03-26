@@ -53,6 +53,7 @@ def enviar_mensagem(destinatario, mensagem):
     except requests.exceptions.RequestException as e:
         logging.error(f"[ERRO] Falha ao enviar mensagem para {destinatario}: {e}")
 
+
 def obter_id_grupo_por_nome(nome_grupo):
     url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/chats"
     try:
@@ -60,7 +61,9 @@ def obter_id_grupo_por_nome(nome_grupo):
         response.raise_for_status()
         data = response.json()
 
-        chats = data.get("chats") or data  # fallback no caso de vir direto
+        logging.info(f"[DEBUG] Conteúdo retornado por /chats: {json.dumps(data, indent=2, ensure_ascii=False)}")
+
+        chats = data.get("chats") if isinstance(data, dict) else data
         if isinstance(chats, str):
             chats = json.loads(chats)
 
@@ -73,6 +76,7 @@ def obter_id_grupo_por_nome(nome_grupo):
     except Exception as e:
         logging.error(f"[ERRO] Falha ao buscar grupo '{nome_grupo}': {e}")
     return None
+
 
 
 def agendar_mensagens_diarias():
