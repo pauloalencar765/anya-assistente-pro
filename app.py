@@ -10,8 +10,8 @@ app = Flask(__name__)
 
 # === CONFIGURAÇÃO ===
 
-ZAPI_INSTANCE_ID = "FC0BB2079B45ED702078B617"
-ZAPI_TOKEN = "3DEBB2A5B63D80B04CBFFA8592F99CB9"
+ZAPI_INSTANCE_ID = "3DEBB2A5B63D80B04CBFFA8592F99CB9"
+ZAPI_TOKEN = "FC0BB2079B45ED702078B617"
 
 # === LOGGING ===
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
