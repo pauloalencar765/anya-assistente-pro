@@ -4,13 +4,23 @@ import threading
 import time
 import requests
 import json
+import logging
+import os
 
 app = Flask(__name__)
 
 # === CONFIGURAÇÃO ===
 
-ZAPI_INSTANCE_ID = "FC0B82079B45ED7020B78617"  # Seu ID da Z-API
-ZAPI_TOKEN = "7uw0lx81pjzrs0r1"               # Seu token da Z-API
+ZAPI_INSTANCE_ID = os.environ.get("ZAPI_INSTANCE_ID")  # Usar variável de ambiente
+ZAPI_TOKEN = os.environ.get("ZAPI_TOKEN")            # Usar variável de ambiente
+
+if not ZAPI_INSTANCE_ID or not ZAPI_TOKEN:
+    print("[ERRO] As variáveis de ambiente ZAPI_INSTANCE_ID e ZAPI_TOKEN não estão definidas.")
+    # Considerar interromper a aplicação aqui se as configurações forem essenciais
+    # raise EnvironmentError("Variáveis de ambiente ZAPI não definidas.")
+
+# === LOGGING ===
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # === CONTATOS E GRUPOS ===
 
@@ -24,10 +34,16 @@ MENSAGEM_DIARIA = "Bom dia! Que hoje seja um dia produtivo e cheio de realizaç�
 # === CONTROLE DE INTERAÇÕES ===
 
 ultimas_interacoes = {}
+INATIVIDADE_TIMEOUT_MINUTOS = 5
+INTERVALO_MONITORAMENTO_INATIVIDADE_SEGUNDOS = 60
 
 # === FUNÇÕES ===
 
 def enviar_mensagem(destinatario, mensagem):
+    if not ZAPI_INSTANCE_ID or not ZAPI_TOKEN:
+        logging.error(f"Não é possível enviar mensagem para {destinatario}. Configurações da Z-API não definidas.")
+        return
+
     url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/send-text"
     payload = {
         "phone": destinatario,
@@ -35,9 +51,11 @@ def enviar_mensagem(destinatario, mensagem):
     }
     headers = {'Content-Type': 'application/json'}
     try:
-        requests.post(url, data=json.dumps(payload), headers=headers)
-    except Exception as e:
-        print(f"[ERRO] Falha ao enviar mensagem para {destinatario}: {e}")
+        response = requests.post(url, data=json.dumps(payload), headers=headers)
+        response.raise_for_status()  # Levanta uma exceção para status de erro (4xx ou 5xx)
+        logging.info(f"Mensagem enviada para {destinatario}: {mensagem}")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"[ERRO] Falha ao enviar mensagem para {destinatario}: {e}")
 
 def agendar_mensagens_diarias():
     while True:
@@ -46,6 +64,7 @@ def agendar_mensagens_diarias():
         if agora >= proxima_execucao:
             proxima_execucao += timedelta(days=1)
         tempo_espera = (proxima_execucao - agora).total_seconds()
+        logging.info(f"Próxima execução de mensagens diárias em {tempo_espera:.0f} segundos.")
         time.sleep(tempo_espera)
 
         for grupo in GRUPOS_MOTIVACAO:
@@ -55,11 +74,16 @@ def agendar_mensagens_diarias():
 def monitorar_inatividade():
     while True:
         agora = datetime.now()
+        contatos_inativos =
         for contato, timestamp in list(ultimas_interacoes.items()):
-            if agora - timestamp > timedelta(minutes=5):
-                enviar_mensagem(contato, "👋 Oi! Você mandou uma mensagem e ainda não tive tempo de responder. Em que posso te ajudar?")
-                ultimas_interacoes.pop(contato)
-        time.sleep(60)
+            if agora - timestamp > timedelta(minutes=INATIVIDADE_TIMEOUT_MINUTOS):
+                contatos_inativos.append(contato)
+
+        for contato in contatos_inativos:
+            enviar_mensagem(contato, f"👋 Oi! Você mandou uma mensagem e ainda não tive tempo de responder. Em que posso te ajudar?")
+            ultimas_interacoes.pop(contato)
+
+        time.sleep(INTERVALO_MONITORAMENTO_INATIVIDADE_SEGUNDOS)
 
 # === ENDPOINTS ===
 
@@ -72,9 +96,6 @@ def receber_webhook():
     remetente = dados.get('phone') or dados.get('chatId') or "desconhecido"
 
     try:
-        # Remova esta linha redundante:
-        # sensagen = dados['message']
-
         conteudo = mensagem_conteudo.strip()
 
         ultimas_interacoes[remetente] = datetime.now()
@@ -86,8 +107,6 @@ def receber_webhook():
     except Exception as e:
         enviar_mensagem(GRUPO_LOG, f"[ERRO] Falha no processamento do webhook: {e}")
         return jsonify({"erro": str(e)}), 500
-
-
 
 @app.route("/")
 def index():
