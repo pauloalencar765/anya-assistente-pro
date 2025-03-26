@@ -73,17 +73,16 @@ def receber_webhook():
     if not dados or 'message' not in dados:
         return jsonify({"status": "sem mensagem"}), 400
 
-
     mensagem = dados['message']
     remetente = dados.get('phone') or dados.get('chatId')
     conteudo = mensagem.strip()
 
     ultimas_interacoes[remetente] = datetime.now()
-
     log = f"📥 Mensagem de {remetente}: {conteudo}"
     enviar_mensagem(GRUPO_LOG, log)
 
     return jsonify({"status": "mensagem registrada"})
+
 
 @app.route("/")
 def index():
