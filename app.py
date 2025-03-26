@@ -12,6 +12,7 @@ app = Flask(__name__)
 
 ZAPI_INSTANCE_ID = "3DEBB2A5B63D80B04CBFFA8592F99CB9"
 ZAPI_TOKEN = "FC0BB2079B45ED702078B617"
+SEU_NUMERO = "559888425166"
 
 # === LOGGING ===
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,7 +23,8 @@ GRUPOS_MOTIVACAO = [
     "FAMÍLIA", "FAMÍLIA MOUTA", "Família Figueiredo",
     "Best Family", "Diretoria", "Sócios Mananciais", "Irmãos"
 ]
-GRUPO_LOG = "Assistente Pessoal"
+GRUPO_LOG_NOME = "Assistente Pessoal"
+GRUPO_LOG_ID = None
 MENSAGEM_DIARIA = "Bom dia! Que hoje seja um dia produtivo e cheio de realizações. 💪"
 
 # === CONTROLE DE INTERAÇÕES ===
@@ -51,6 +53,21 @@ def enviar_mensagem(destinatario, mensagem):
     except requests.exceptions.RequestException as e:
         logging.error(f"[ERRO] Falha ao enviar mensagem para {destinatario}: {e}")
 
+def obter_id_grupo_por_nome(nome_grupo):
+    url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/chats"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        chats = response.json()
+        for chat in chats:
+            if chat.get("name") == nome_grupo:
+                logging.info(f"[INFO] ID do grupo '{nome_grupo}' encontrado: {chat.get('id')}")
+                return chat.get("id")
+        logging.warning(f"[AVISO] Grupo '{nome_grupo}' não encontrado.")
+    except Exception as e:
+        logging.error(f"[ERRO] Falha ao buscar grupo '{nome_grupo}': {e}")
+    return None
+
 def agendar_mensagens_diarias():
     while True:
         agora = datetime.now()
@@ -63,7 +80,8 @@ def agendar_mensagens_diarias():
 
         for grupo in GRUPOS_MOTIVACAO:
             enviar_mensagem(grupo, MENSAGEM_DIARIA)
-        enviar_mensagem(GRUPO_LOG, f"✅ Mensagens motivacionais enviadas para: {', '.join(GRUPOS_MOTIVACAO)}")
+        if GRUPO_LOG_ID:
+            enviar_mensagem(GRUPO_LOG_ID, f"✅ Mensagens motivacionais enviadas para: {', '.join(GRUPOS_MOTIVACAO)}")
 
 def monitorar_inatividade():
     while True:
@@ -83,21 +101,43 @@ def monitorar_inatividade():
 
 @app.route("/zapi-webhook", methods=["POST"])
 def receber_webhook():
+    global GRUPO_LOG_ID
     dados = request.json
     logging.info(f"Dados recebidos no webhook: {dados}")
 
-    mensagem_conteudo = dados.get('message') or dados.get('body') or 'sem_conteudo'
+    mensagem_conteudo = (
+        dados.get('message') or
+        dados.get('body') or
+        dados.get("text", {}).get("message", "") or
+        'sem_conteudo'
+    )
     remetente = dados.get('phone') or dados.get('chatId') or "desconhecido"
+    chat_name = dados.get("chatName", "Desconhecido")
+    participante = dados.get("participantPhone", "Desconhecido")
 
     try:
         conteudo = mensagem_conteudo.strip()
         ultimas_interacoes[remetente] = datetime.now()
+
+        if not GRUPO_LOG_ID:
+            GRUPO_LOG_ID = obter_id_grupo_por_nome(GRUPO_LOG_NOME)
+
         log = f"📥 Mensagem de {remetente}: {conteudo}"
-        enviar_mensagem(GRUPO_LOG, log)
+        if GRUPO_LOG_ID:
+            enviar_mensagem(GRUPO_LOG_ID, log)
+
+        if f"@{SEU_NUMERO}" in conteudo or "Paulo" in conteudo:
+            mensagem_mencao = (
+                f"📣 Você foi mencionado no grupo '{chat_name}' por {participante}:\n\n{conteudo}"
+            )
+            if GRUPO_LOG_ID:
+                enviar_mensagem(GRUPO_LOG_ID, mensagem_mencao)
+
         return jsonify({"status": "mensagem registrada"})
 
     except Exception as e:
-        enviar_mensagem(GRUPO_LOG, f"[ERRO] Falha no processamento do webhook: {e}")
+        if GRUPO_LOG_ID:
+            enviar_mensagem(GRUPO_LOG_ID, f"[ERRO] Falha no processamento do webhook: {e}")
         return jsonify({"erro": str(e)}), 500
 
 @app.route("/")
@@ -107,6 +147,7 @@ def index():
 # === EXECUÇÃO ===
 
 if __name__ == "__main__":
+    GRUPO_LOG_ID = obter_id_grupo_por_nome(GRUPO_LOG_NOME)
     threading.Thread(target=agendar_mensagens_diarias, daemon=True).start()
     threading.Thread(target=monitorar_inatividade, daemon=True).start()
     app.run(host="0.0.0.0", port=10000)
