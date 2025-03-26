@@ -55,7 +55,7 @@ def enviar_mensagem(destinatario, mensagem):
         logging.error(f"[ERRO] Falha ao enviar mensagem para {destinatario}: {e}")
 
 def obter_id_grupo_por_nome(nome_grupo):
-    url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/chats"
+    url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/chats?page=1&pageSize=20"
     headers = {
         "Client-Token": CLIENT_TOKEN
     }
