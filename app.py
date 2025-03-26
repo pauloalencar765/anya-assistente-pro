@@ -74,12 +74,12 @@ def agendar_mensagens_diarias():
 def monitorar_inatividade():
     while True:
         agora = datetime.now()
-        contatos_inativos =
+       contatos_inativos = []
         for contato, timestamp in list(ultimas_interacoes.items()):
             if agora - timestamp > timedelta(minutes=INATIVIDADE_TIMEOUT_MINUTOS):
                 contatos_inativos.append(contato)
 
-        for contato in list(contatos_inativos):
+        for contato in list(contatos_inativos): # Iterando sobre uma cópia da lista
             enviar_mensagem(contato, f"👋 Oi! Você mandou uma mensagem e ainda não tive tempo de responder. Em que posso te ajudar?")
             ultimas_interacoes.pop(contato)
 
@@ -92,12 +92,7 @@ def receber_webhook():
     dados = request.json
     logging.info(f"Dados recebidos no webhook: {dados}")
 
-    mensagem_conteudo = dados.get('message') or dados.get('body')
-    if not mensagem_conteudo and 'text' in dados and 'message' in dados['text']:
-        mensagem_conteudo = dados['text']['message']
-    elif not mensagem_conteudo:
-        mensagem_conteudo = 'sem_conteudo'
-
+    mensagem_conteudo = dados.get('message') or dados.get('body') or 'sem_conteudo'
     remetente = dados.get('phone') or dados.get('chatId') or "desconhecido"
 
     try:
