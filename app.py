@@ -66,20 +66,23 @@ def monitorar_inatividade():
 @app.route("/zapi-webhook", methods=["POST"])
 def receber_webhook():
     dados = request.json
+    logging.info(f"Dados recebidos no webhook: {dados}")
 
-    # Log bruto para debug
-    enviar_mensagem(GRUPO_LOG, f"[DEBUG] Webhook bruto recebido:\n{json.dumps(dados, indent=2)}")
+    mensagem_conteudo = dados.get('message') or dados.get('body') or 'sem_conteudo'
+    remetente = dados.get('phone') or dados.get('chatId') or "desconhecido"
 
     try:
-        # Tenta extrair conteúdo da mensagem
-        mensagem = dados.get('message') or dados.get('body') or 'sem_conteudo'
-        remetente = dados.get('phone') or dados.get('chatId') or 'desconhecido'
+        # Remova esta linha redundante:
+        # sensagen = dados['message']
+
+        conteudo = mensagem_conteudo.strip()
 
         ultimas_interacoes[remetente] = datetime.now()
-        log = f"📥 Mensagem de {remetente}: {mensagem}"
-        enviar_mensagem(GRUPO_LOG, log)
 
+        log = f"📥 Mensagem de {remetente}: {conteudo}"
+        enviar_mensagem(GRUPO_LOG, log)
         return jsonify({"status": "mensagem registrada"})
+
     except Exception as e:
         enviar_mensagem(GRUPO_LOG, f"[ERRO] Falha no processamento do webhook: {e}")
         return jsonify({"erro": str(e)}), 500
